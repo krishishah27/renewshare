@@ -1,0 +1,341 @@
+---
+title: "Final Project 9750"
+output: word_document
+date: "2024-04-25"
+---
+
+## Data Cleaning
+
+```{r Q1}
+energy = read.csv("energy.csv")
+names(energy)
+dim(energy)
+
+energy <- energy[, -c(5, 6, 9, 10, 11, 15)]
+names(energy)
+dim(energy)
+
+rows_to_delete <- which(apply(energy, 1, function(row) any(is.na(row) | row == "" | row == "XNA")))
+
+energy <- energy[-rows_to_delete, ]
+dim(energy)
+
+y2019 <- subset(energy, Year == 2019)
+head(y2019)
+```
+
+```{r Q2}
+colnames(y2019) <- c("Entity","Year","PopAccessElec","PopAccessCleanFuel", "RenewShare","ElecFossil","PrimaryConsumpCap","EnergyIntensity","Emissions", "gdp_growth" , "gdp_per_capita" , "density" , "landarea" , "latitude" , "longitude" )
+names(y2019)
+
+y2019$density <- as.numeric(gsub(",", "", y2019$density))
+
+View(y2019)
+```
+
+##Regression Analysis
+
+The histogram and qq plots below illustrate the distribution of observations of RenewShare, the variable we've selected as our response variable.
+
+```{r Q3}
+library(regclass)
+hist(y2019$RenewShare)
+qq(y2019$RenewShare)
+```
+
+Median provides a better summary of the typical value of `RenewShare` (rather than mean) since the plots above demonstrate a LACK of approximate Normality.
+
+Below, we constructed separate models regressing RenewShare over each other individual variable in the cleaned dataset. Taking the summary of each of these models can help us determine whether each predictor variable is significant.
+
+```{r Q4}
+a<-lm(RenewShare~landarea,data=y2019)
+summary(a)
+
+b<-lm(RenewShare~latitude,data=y2019)
+summary(b)
+
+c<-lm(RenewShare~PrimaryConsumpCap,data=y2019)
+summary(c)
+
+d<-lm(RenewShare~PopAccessElec,data=y2019)
+summary(d)
+
+e<-lm(RenewShare~PopAccessCleanFuel,data=y2019)
+summary(e)
+
+f<-lm(RenewShare~ElecFossil,data=y2019)
+summary(f)
+
+g<-lm(RenewShare~EnergyIntensity,data=y2019)
+summary(h)
+
+h<-lm(RenewShare~Emissions,data=y2019)
+summary(i)
+
+i<-lm(RenewShare~gdp_growth,data=y2019)
+summary(j)
+
+j<-lm(RenewShare~gdp_per_capita,data=y2019)
+summary(k)
+
+k<-lm(RenewShare~density,data=y2019)
+summary(k)
+
+l<-lm(RenewShare~longitude,data=y2019)
+summary(l)
+```
+
+Above, we modeled each potential predictor of RenewShare separately to determine whether each may stand alone as significant (if their p-value < 0.05). We are also able to compare their RMSE values (the lower the better) to one another as well as to that of the Naive model. Predictors with p-values less than 0.05 are included in the "z" model below:
+
+```{r Q5}
+z<-lm(RenewShare~gdp_per_capita+EnergyIntensity+latitude+PrimaryConsumpCap+PopAccessCleanFuel+PopAccessElec+density,data=y2019)
+summary(z)
+```
+The "z" model containing presumably significant predictors has a significantly lower RMSE than that (27.90359) of the Naive model below. Therefore, at least one of the predictors included in the model above is significant. However, considering the p-values above, the individual significance of some of those predictors (namely, latitude and density) is lost when grouped in one model with the more significant predictors. 
+
+```{r Q6}
+sd(y2019$RenewShare)
+```
+
+We replaced the "z" model above, with the following "w" model, which excludes latitude and (population) density, reducing the number of predictor variables from seven to five. The RMSE of the "z" model is slightly lower than that of the old "w" model, which was already significantly lower than the RMSE of the Naive model.
+
+```{r Q7}
+w<-lm(RenewShare~gdp_per_capita+EnergyIntensity+PrimaryConsumpCap+PopAccessCleanFuel+PopAccessElec,data=y2019)
+summary(w)
+```
+
+Previously, we constructed separate models regressing RenewShare over each other individual variable in the cleaned dataset. 
+
+Below we took summaries once more--this time just for each of the separate models of the remaining presumably significant predictor variables (those from model "w"). Then we can compare the resulting RMSE values more easily.
+
+```{r Q8}
+summary(c)
+summary(d)
+summary(e)
+summary(g)
+summary(j)
+```
+
+RMSE values from the models of PopAccessElec (19.25) and PopAccessCleanFuel (18.98) is significantly less than that of naive model (27.90359). This suggests that PopAccessElec and PopAccessCleanFuel may be worth including in the final model. 
+
+On the other hand, RMSE of the models containing gdp_per_capita (26.67), EnergyIntensity (26.56), and PrimaryConsumpCap (25.76) are not significantly less than that of the naive model (27.90359).
+
+This suggests that gdp_per_capita, EnergyIntensity, PrimaryConsumpCap, and LowCarbonElec may not be worth including in the final model, but this requires further analysis before making a final decision. The next step is finding the confidence intervals of the slope estimates for each of the five predictors.
+
+```{r Q9}
+confint(c, levels=0.95)
+confint(d, levels=0.95)
+confint(e, levels=0.95)
+confint(g, levels=0.95)
+confint(j, levels=0.95)
+```
+
+In each of the cases above, 0 is outside the 95% confidence intervals of the slope estimates. This suggests that the five regressions are statistically significant.
+
+```{r Q10}
+library(regclass)
+y2019cor = y2019[,c(3, 4, 5, 7, 8, 11)]
+all_correlations(y2019cor, sorted="magnitude")
+```
+
+According to the results above, all Pearson correlations involving RenewShare and one of the five predictors in consideration have a p-value < 0.05, suggesting significance.
+
+PopAccessCleanFuel (-0.73516683) and PopAccessElec (-0.72608735) appear to have strong negative linear relationships with RenewShare.
+
+PrimaryConsumpCap (-0.39207362) and	gdp_per_capita (-0.30406243) appear to have fairly weak negative linear relationships with RenewShare.
+
+EnergyIntensity (0.31645372) appears to have a fairly weak positive linear relationship with RenewShare.
+
+However, these metrics can be misleading, as not all relationships can be appropriately measured by Pearson correlation. Let's take a look at scatterplots of each relationship to decide whether they may be appropriately measured by Pearson correlation, Spearman's rank correlation, both, or neither.
+
+```{r Q11}
+library(ggplot2)
+ggplot(data=y2019, aes(x=PrimaryConsumpCap, y=RenewShare)) +
+  xlab("Primary energy consumption per capita (kWh/person)") +
+  ylab("Renewable energy share in total final energy consumption (%)") +
+  geom_point(pch=1, size=1, color="red") +
+  geom_smooth(method="lm", color="gray", se=FALSE) +
+  geom_smooth(method="loess", color="blue", se=FALSE)
+```
+
+Removing two disruptive outliers beyond x=175000...
+
+```{r Q12}
+y2019outPCC <- y2019[y2019$PrimaryConsumpCap <= 175000, ]
+
+library(ggplot2)
+ggplot(data=y2019outPCC, aes(x=PrimaryConsumpCap, y=RenewShare)) +
+  xlab("Primary energy consumption per capita (kWh/person)") +
+  ylab("Renewable energy share in total final energy consumption (%)") +
+  geom_point(pch=1, size=1, color="red") +
+  geom_smooth(method="lm", color="gray", se=FALSE) +
+  geom_smooth(method="loess", color="blue", se=FALSE)
+```
+
+The relationship above is nonellipsoidal (eliminating consideration of Pearson's correlation), nonlinear, and nonmonotonic (eliminating consideration of Spearman's rank correlation). To address the nonlinearity,  let's make a transformation by taking the logarithm (base=10) of our x variable:
+
+```{r Q13}
+library(ggplot2)
+ggplot(data=y2019outPCC, aes(x=log10(PrimaryConsumpCap), y=RenewShare)) +
+  xlab("Primary energy consumption per capita (kWh/person)") +
+  ylab("Renewable energy share in total final energy consumption (%)") +
+  geom_point(pch=1, size=1, color="red") +
+  geom_smooth(method="lm", color="gray", se=FALSE) +
+  geom_smooth(method="loess", color="blue", se=FALSE)
+```
+
+The data cloud above maintains closer proximity to the gray line of best fit; taking the logarithm of our x variable improved linearity and ellipsoidal form to a considerable extent. Therefore, Pearson's correlation may be an appropriate measure. Futhermore, the relationship between RenewShare and log10(PrimaryConsumpCap) is directionally negative and moderate in strength yet still heteroscedastic (i.e., the width of the range of RenewShare values changes over the range of log10(PrimaryConsumpCap) values)--and still contains some outliers. The relationship is largely monotonic, so Spearman's rank correlation may be considered too if necessary.
+
+```{r Q14}
+library(ggplot2)
+ggplot(data=y2019, aes(x=PopAccessElec, y=RenewShare)) +
+  xlab("% population with access to electricity") +
+  ylab("Renewable energy share in total final energy consumption (%)") +
+  geom_point(pch=1, size=1, color="red") +
+  geom_smooth(method="lm", color="gray", se=FALSE) +
+  geom_smooth(method="loess", color="blue", se=FALSE)
+```
+
+Based on the data cloud above, the relationship between RenewShare and PopAccessElec is directionally negative and weak (i.e., knowing the value of PopAccessElec does not sufficiently narrow down the range of possible RenewShare values). The relationship is also non-ellipsoidal and heteroscedastic (i.e., the width of the range of RenewShare values changes over the range of PopAccessElec values). Therefore, Pearson's correlation is NOT an appropriate measure. However, the relationship is marginally significantly linear and monotonic, so Spearman's rank correlation may be considered.
+
+```{r Q15}
+library(ggplot2)
+ggplot(data=y2019, aes(x=PopAccessCleanFuel, y=RenewShare)) +
+  xlab("% population with primary reliance on clean fuels") +
+  ylab("Renewable energy share in total final energy consumption (%)") +
+  geom_point(pch=1, size=1, color="red") +
+  geom_smooth(method="lm", color="gray", se=FALSE) +
+  geom_smooth(method="loess", color="blue", se=FALSE)
+```
+
+Based on the data cloud above, the relationship between RenewShare and PopAccessCleanFuel is directionally negative and weak. The relationship is also non-ellipsoidal and heteroscedastic. Therefore, Pearson's correlation is NOT an appropriate measure. The relationship is marginally significantly linear and monotonic, so Spearman's rank correlation may be considered.
+
+```{r Q16}
+library(ggplot2)
+ggplot(data=y2019, aes(x=EnergyIntensity, y=RenewShare)) +
+  xlab("Energy Intensity (MJ/$2011 PPP GDP)") +
+  ylab("Renewable energy share in total final energy consumption (%)") +
+  geom_point(pch=1, size=1, color="red") +
+  geom_smooth(method="lm", color="gray", se=FALSE) +
+  geom_smooth(method="loess", color="blue", se=FALSE)
+```
+
+Removing three disruptive outliers beyond x=12.5...
+
+```{r Q17}
+y2019outEI <- y2019[y2019$EnergyIntensity <= 12.5, ]
+library(ggplot2)
+ggplot(data=y2019outEI, aes(x=EnergyIntensity, y=RenewShare)) +
+  xlab("Energy Intensity (MJ/$2011 PPP GDP)") +
+  ylab("Renewable energy share in total final energy consumption (%)") +
+  geom_point(pch=1, size=1, color="red") +
+  geom_smooth(method="lm", color="gray", se=FALSE) +
+  geom_smooth(method="loess", color="blue", se=FALSE)
+```
+
+The relationship above is nonellipsoidal (eliminating consideration of Pearson's correlation), nonlinear, and nonmonotonic (eliminating consideration of Spearman's rank correlation). To address this,  let's make a transformation by taking the logarithm (base=10) of our x variable:
+
+```{r Q18}
+library(ggplot2)
+ggplot(data=y2019outEI, aes(x=log10(EnergyIntensity), y=RenewShare)) +
+  xlab("Energy Intensity (MJ/$2011 PPP GDP)") +
+  ylab("Renewable energy share in total final energy consumption (%)") +
+  geom_point(pch=1, size=1, color="red") +
+  geom_smooth(method="lm", color="gray", se=FALSE) +
+  geom_smooth(method="loess", color="blue", se=FALSE)
+```
+
+The data cloud above maintains closer proximity to the gray line of best fit; taking the logarithm of our x variable improved linearity and ellipsoidal form to an extent. Therefore, Pearson's correlation may be an appropriate measure. Futhermore, the relationship between RenewShare and log10(EnergyIntensity) is directionally positive and moderate in strength yet still heteroscedastic (i.e., the width of the range of RenewShare values changes over the range of log10(EnergyIntensity) values). The relationship is largely monotonic, so Spearman's rank correlation may be considered too if necessary.
+
+```{r Q19}
+library(ggplot2)
+ggplot(data=y2019, aes(x=gdp_per_capita, y=RenewShare)) +
+  xlab("GDP per capita") +
+  ylab("Renewable energy share in total final energy consumption (%)") +
+  geom_point(pch=1, size=1, color="red") +
+  geom_smooth(method="lm", color="gray", se=FALSE) +
+  geom_smooth(method="loess", color="blue", se=FALSE)
+```
+
+The relationship above is nonellipsoidal (eliminating consideration of Pearson's correlation), nonlinear, and nonmonotonic (eliminating consideration of Spearman's rank correlation). To address this,  let's make a transformation by taking the logarithm (base=10) of our x variable:
+
+```{r Q20}
+library(ggplot2)
+ggplot(data=y2019, aes(x=log10(gdp_per_capita), y=RenewShare)) +
+  xlab("Logarithm of GDP per capita") +
+  ylab("Renewable energy share in total final energy consumption (%)") +
+  geom_point(pch=1, size=1, color="red") +
+  geom_smooth(method="lm", color="gray", se=FALSE) +
+  geom_smooth(method="loess", color="blue", se=FALSE)
+```
+
+The data cloud above maintains closer proximity to the gray line of best fit; taking the logarithm of our x variable improved linearity and ellipsoidal form to an extent. Therefore, Pearson's correlation may be an appropriate measure. Futhermore, the relationship between RenewShare and log10(gdp_per_capita) is directionally positive and moderate in strength yet still heteroscedastic (i.e., the width of the range of RenewShare values changes over the range of log10(gdp_per_capita) values). The relationship is still nonmonotonic (according to the blue Loess smoother), however, so Spearman's rank correlation will not be considered.
+
+##Association Analysis
+
+Use `associate`, adding the argument `seed=298` so that the set of 500 (default value) permutations generated are reproducible.
+
+```{r Q21}
+library(regclass)
+associate(RenewShare~log10(PrimaryConsumpCap),data=y2019outPCC,seed=298,permutations=500)
+```
+
+With 500 permutations, we are 95% confident that the p-values (of both Pearson's correlation and Spearman's rank correlation) are between 0 and 0.007. The fact that this range is less than 0.05, suggests that the association between RenewShare and log10(PrimaryConsumpCap) is statistically significant.
+
+Observing the plots of Chance values of both Pearson and Spearman, the reductions in SSE (represented by the solid red line) are far beyond what happens "by chance" (per the histogram of permutations), asserting the regression is statistically significant.
+
+```{r Q22}
+(-0.7571062)^2
+```
+
+Squaring the Pearson's correlation coefficient for the regression of RenewShare over log10(PrimaryConsumpCap), we find R^2 = 0.5732098, indicating a moderately strong relationship.
+
+```{r Q23}
+associate(RenewShare~PopAccessElec,data=y2019,seed=298)
+```
+
+With 500 permutations, we are 95% confident that the p-value (of Spearman's rank correlation) is between 0 and 0.007. The fact that this range is less than 0.05, suggests that the association between RenewShare and PopAccessElec is statistically significant.
+
+Observing the plot of Chance values of Spearman, the reduction in SSE (represented by the solid red line) is far beyond what happens "by chance" (per the histogram of permutations), asserting the regression is statistically significant.
+
+However, recalling the lack of ellipsoidal form as demonstrated in our graphical analysis, we must maintain that RenewShare has a particularly weak linear relationship with PopAccessElec.
+
+```{r Q24}
+associate(RenewShare~PopAccessCleanFuel,data=y2019,seed=298) 
+```
+
+With 500 permutations, we are 95% confident that the p-value (of Spearman's rank correlation) is between 0 and 0.007. The fact that this range is less than 0.05, suggests that the association between RenewShare and PopAccessCleanFuel is statistically significant.
+
+Observing the plot of Chance values of Spearman, the reduction in SSE (represented by the solid red line) is far beyond what happens "by chance" (per the histogram of permutations), asserting the regression is statistically significant.
+
+However, recalling the lack of ellipsoidal form as demonstrated in our graphical analysis, we must maintain that RenewShare has a weak linear relationship with PopAccessCleanFuel.
+
+```{r Q25}
+associate(RenewShare~log10(EnergyIntensity),data=y2019outEI,seed=298) 
+```
+
+With 500 permutations, we are 95% confident that the p-values (of both Pearson's correlation and Spearman's rank correlation) are between 0 and 0.007. The fact that this range is less than 0.05, suggests that the association between RenewShare and log10(EnergyIntensity) is statistically significant.
+
+Observing the plots of Chance values of both Pearson and Spearman, the reductions in SSE (represented by the solid red line) are far beyond what happens "by chance" (per the histogram of permutations), asserting the regression is statistically significant.
+
+```{r Q26}
+(0.4082758)^2
+```
+
+Squaring the Pearson's correlation coefficient for the regression of RenewShare over log10(EnergyIntensity), we find R^2 = 0.1666891, indicating a weak relationship.
+
+```{r Q27}
+associate(RenewShare~log10(gdp_per_capita),data=y2019,seed=298) 
+```
+
+With 500 permutations, we are 95% confident that the p-value (of Pearson's correlation) is between 0 and 0.007. The fact that this range is less than 0.05, suggests that the association between RenewShare and log10(gdp_per_capita) is statistically significant.
+
+Observing the plot of Chance values of Pearson, the reduction in SSE (represented by the solid red line) is far beyond what happens "by chance" (per the histogram of permutations), asserting the regression is statistically significant.
+
+```{r Q28}
+(-0.6214202)^2
+```
+
+Squaring the Pearson's correlation coefficient for the regression of RenewShare over log10(gdp_per_capita), we find R^2 = 0.3861631, indicating a fairly weak relationship.
+
+The results of our association analysis indicate that all five presumably significant predictors are indeed statistically significant--at least when enhancing via logarithmic transformation when helpful. However, among each significant predictors' separate relationship with RenewShare, the strongest was that for log10(PrimaryConsumpCap), with an R^2 = 0.5732098. This is moderate at best, so log10(PrimaryConsumpCap) may not actually be a particularly reliable predictor of RenewShare in practice. With an R^2 of 0.3861631, log10(gdp_per_capita) is a fairly weak predictor of RenewShare. log10(EnergyIntensity) , PopAccessElec, and PopAccessCleanFuel are even weaker predictors in practice, despite being statistically significant in theory.
